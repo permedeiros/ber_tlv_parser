@@ -70,11 +70,12 @@ static const char *__getClassString(TBerTlvObj *tlvObj);
 static uint8_t __getObjTypeIndex(uint8_t tagByte);
 static uint8_t __getClassIndex(uint8_t tagByte);
 static char *__addIndentation(char *str, uint16_t constructedLevels);
+static uint16_t __skipGarbageData(uint8_t *data, uint16_t size);
 
 //-----------------------------------------------------------------------------------------------------------------------------//
 //-------------------------------------------------------Public functions------------------------------------------------------//
 
-void berTlv_printFromRawData(uint8_t *rawData, uint32_t size)
+void berTlv_printFromRawData(uint8_t *rawData, uint16_t size)
 {
     TBerTlvObj tlvObj;
     char outputStr[4096];
@@ -84,14 +85,14 @@ void berTlv_printFromRawData(uint8_t *rawData, uint32_t size)
 
     uint16_t constructedSizeStack[5] = {0};
     uint8_t constructedLevels = 0;
+    
+    bool isNotInConstructedObject = true;
 
     while (remaningSize)
     {
-        bool err = berTlv_parseRawData(data, remaningSize, &tlvObj);
-        if (err)
-        {
-            return;
-        }
+        bool err = berTlv_parseRawData(data, &remaningSize, &tlvObj, isNotInConstructedObject);
+        if (err) return;
+        if(remaningSize == 0) break;
         strP = __addIndentation(strP, constructedLevels);
         strP += sprintf(strP, "TAG - 0x%02X (%s, %s)\n",
                         tlvObj.tag,
@@ -115,6 +116,7 @@ void berTlv_printFromRawData(uint8_t *rawData, uint32_t size)
             constructedSizeStack[constructedLevels] = tlvObj.valueSize;
             constructedLevels++;
             strP += sprintf(strP, "\n");
+            isNotInConstructedObject = false;
         }
         else
         {
@@ -138,7 +140,11 @@ void berTlv_printFromRawData(uint8_t *rawData, uint32_t size)
                 if (constructedSizeStack[constructedLevels - 1] == 0)
                 {
                     constructedLevels--;
+                    isNotInConstructedObject = true;
                 }
+            }
+            else{
+                isNotInConstructedObject = true;
             }
         }
     }
@@ -146,38 +152,47 @@ void berTlv_printFromRawData(uint8_t *rawData, uint32_t size)
     printf("%s\n", outputStr);
 }
 
-bool berTlv_parseRawData(uint8_t *data, uint32_t size, TBerTlvObj *tlvObjOut)
+bool berTlv_parseRawData(uint8_t *data, uint16_t *size, TBerTlvObj *tlvObjOut, bool isNotInConstructedObject)
 {
     uint8_t *dataP = data;
     uint8_t minHeaderSize = MIN_HEADER_SIZE;
     bool error = false;
 
-    tlvObjOut->tagSize = __getTagSize(data[0]);
+    uint16_t skippedBytes = 0;
+
+    if(isNotInConstructedObject){
+        skippedBytes = __skipGarbageData(dataP, *size);
+        *size = *size - skippedBytes;
+        if(*size == 0) return 0;
+        dataP += skippedBytes;
+    }
+    
+    tlvObjOut->tagSize = __getTagSize(dataP[0]);
 
     if (tlvObjOut->tagSize == 2)
     {
         minHeaderSize += 1;
     }
 
-    error = size < minHeaderSize;
-    BER_TLV_ASSERT_NON_FATAL(size >= minHeaderSize, "Invalid size (%d). It should be at "
+    error = *size < minHeaderSize;
+    BER_TLV_ASSERT_NON_FATAL(*size >= minHeaderSize, "Invalid size (%d). It should be at "
                                                     "least the minimum header size (%d). Interrupting data parsing.\n",
-                             size,
+                             *size,
                              minHeaderSize);
     if (error)
         return true;
 
-    tlvObjOut->tag = __getTag(data);
+    tlvObjOut->tag = __getTag(dataP);
     dataP += tlvObjOut->tagSize;
     tlvObjOut->lengthSize = __getLengthFieldSize(dataP);
     tlvObjOut->lengthValue = __getLength(dataP);
     tlvObjOut->valueSize = __getValueSize(dataP);
 
     uint8_t fullObjSize = tlvObjOut->tagSize + tlvObjOut->lengthSize + tlvObjOut->valueSize;
-    error = size < fullObjSize;
-    BER_TLV_ASSERT_NON_FATAL(size >= fullObjSize, "Invalid size (%d). It should be at least %d bytes -> tag size(%d) +"
-                                                  "length size(%d) + value size(%d).\n Interrupting data parsing.",
-                             size,
+    error = *size < fullObjSize;
+    BER_TLV_ASSERT_NON_FATAL(*size >= fullObjSize, "Invalid size (%d). It should be at least %d bytes -> tag size(%d) +"
+                                                  "length size(%d) + value size(%x).\n Interrupting data parsing.",
+                             *size,
                              fullObjSize,
                              tlvObjOut->tagSize,
                              tlvObjOut->lengthSize,
@@ -304,4 +319,17 @@ static char *__addIndentation(char *str, uint16_t constructedLevels)
     }
     *str = 0;
     return str;
+}
+
+
+static uint16_t __skipGarbageData(uint8_t *data, uint16_t size){
+    uint8_t *dataPtr = data;
+    uint16_t skippedBytes= 0;
+
+    while(size && (*dataPtr == 0 || *dataPtr == 0xFF)){
+        ++dataPtr;
+        ++skippedBytes;
+        size--;
+    }
+    return skippedBytes;
 }

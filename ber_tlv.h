@@ -27,16 +27,19 @@ typedef struct
 /**
  * @brief Prints raw data as BER TLV objects
  */
-void berTlv_printFromRawData(uint8_t *data, uint32_t size);
+void berTlv_printFromRawData(uint8_t *data, uint16_t size);
 
 /**
  * @brief Parse an raw data array.
+ * @warning: As garbage data is allowed before, between and after tlv objects, this function will 
+ * skip garbage data and update size accordingly.
  * @param data Raw data pointer
- * @param size Raw data size in bytes
- * @param tlvObjOut Pointer to tlv objected to filled with parsed data.
+ * @param size Pointer to the raw data size in bytes
+ * @param tlvObjOut Pointer to tlv object that will be filled with parsed data.
+ * @param isNotInConstructedObject  Infors if the current object is within a constructed object.
  * @return true if an error happened during the data parsing.
  */
-bool berTlv_parseRawData(uint8_t *data, uint32_t size, TBerTlvObj *tlvObjOut);
+bool berTlv_parseRawData(uint8_t *data, uint16_t *size, TBerTlvObj *tlvObjOut, bool isNotInConstructedObject);
 
 
 #endif
