@@ -188,6 +188,8 @@ bool berTlv_parseRawData(uint8_t *data, uint32_t size, TBerTlvObj *tlvObjOut)
     dataP += tlvObjOut->lengthSize;
 
     tlvObjOut->value = dataP;
+
+    return false;
 }
 
 //-----------------------------------------------------------------------------------------------------------------------------//
