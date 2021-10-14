@@ -1,3 +1,10 @@
+/**
+ * @file
+ * @brief Parser of BER-TLV format
+ * @author Pedro Eugênio Rocha Medeiros
+ * @date 14/10/2021
+ */
+
 #include "ber_tlv.h"
 
 #include <stdbool.h>
@@ -75,37 +82,48 @@ static uint16_t __skipGarbageData(uint8_t *data, uint16_t size);
 //-----------------------------------------------------------------------------------------------------------------------------//
 //-------------------------------------------------------Public functions------------------------------------------------------//
 
-uint16_t berTlv_printFromRawData(uint8_t *data, uint16_t dataSize, char *outputStr)
+uint16_t berTlv_printFromRawData(uint8_t *data, uint16_t size, char *outputStr)
 {
     TBerTlvObj tlvObj;
     char *strP = outputStr;
     uint8_t *dataPtr = data;
-    uint16_t remaningSize = dataSize;
+    uint16_t remainingSize = size;
     uint16_t bytesWriten = 0;
 
     uint16_t constructedSizeStack[5] = {0};
     uint8_t constructedLevels = 0;
-    
+
     bool isNotInConstructedObject = true;
 
-    while (remaningSize)
+    while (remainingSize)
     {
-        bool err = berTlv_parseRawData(dataPtr, &remaningSize, &tlvObj, isNotInConstructedObject);
-        if (err) return bytesWriten;
-        if(remaningSize == 0) break;
+        bool err = berTlv_parseRawData(dataPtr, &remainingSize, &tlvObj, isNotInConstructedObject);
+        if (err)
+            return bytesWriten;
+        // This means that all remaining bytes were garbage data and were skipped by the parse function
+        if (remainingSize == 0)
+            break;
+
         char *startPos = strP;
+
         strP += __addIndentation(strP, constructedLevels);
+
         strP += sprintf(strP, "TAG - 0x%02X (%s, %s)\n",
                         tlvObj.tag,
                         __getClassString(&tlvObj),
                         __getObjTypeString(&tlvObj));
+
         strP += __addIndentation(strP, constructedLevels);
+
         strP += sprintf(strP, "LEN - %d bytes\n", tlvObj.lengthValue);
+
         dataPtr = tlvObj.value;
+
         uint16_t headerSize = (tlvObj.tagSize + tlvObj.lengthSize);
+
         if (__isConstructed(&tlvObj))
         {
-            remaningSize -= headerSize;
+            remainingSize -= headerSize;
             if (constructedLevels)
             {
                 constructedSizeStack[constructedLevels - 1] -= (+headerSize + tlvObj.valueSize);
@@ -122,7 +140,7 @@ uint16_t berTlv_printFromRawData(uint8_t *data, uint16_t dataSize, char *outputS
         else
         {
             uint16_t fullObjSize = headerSize + tlvObj.valueSize;
-            remaningSize -= fullObjSize;
+            remainingSize -= fullObjSize;
             if (tlvObj.valueSize)
             {
                 strP += __addIndentation(strP, constructedLevels);
@@ -144,7 +162,8 @@ uint16_t berTlv_printFromRawData(uint8_t *data, uint16_t dataSize, char *outputS
                     isNotInConstructedObject = true;
                 }
             }
-            else{
+            else
+            {
                 isNotInConstructedObject = true;
             }
         }
@@ -162,13 +181,15 @@ bool berTlv_parseRawData(uint8_t *data, uint16_t *size, TBerTlvObj *tlvObjOut, b
 
     uint16_t skippedBytes = 0;
 
-    if(isNotInConstructedObject){
+    if (isNotInConstructedObject)
+    {
         skippedBytes = __skipGarbageData(dataP, *size);
         *size = *size - skippedBytes;
-        if(*size == 0) return 0;
+        if (*size == 0)
+            return 0;
         dataP += skippedBytes;
     }
-    
+
     tlvObjOut->tagSize = __getTagSize(dataP[0]);
 
     if (tlvObjOut->tagSize == 2)
@@ -178,7 +199,7 @@ bool berTlv_parseRawData(uint8_t *data, uint16_t *size, TBerTlvObj *tlvObjOut, b
 
     error = *size < minHeaderSize;
     BER_TLV_ASSERT_NON_FATAL(*size >= minHeaderSize, "Invalid size (%d). It should be at "
-                                                    "least the minimum header size (%d). Interrupting data parsing.\n",
+                                                     "least the minimum header size (%d). Interrupting data parsing.\n",
                              *size,
                              minHeaderSize);
     if (error)
@@ -193,7 +214,7 @@ bool berTlv_parseRawData(uint8_t *data, uint16_t *size, TBerTlvObj *tlvObjOut, b
     uint8_t fullObjSize = tlvObjOut->tagSize + tlvObjOut->lengthSize + tlvObjOut->valueSize;
     error = *size < fullObjSize;
     BER_TLV_ASSERT_NON_FATAL(*size >= fullObjSize, "Invalid size (%d). It should be at least %d bytes -> tag size(%d) +"
-                                                  "length size(%d) + value size(%d).\n Interrupting data parsing.",
+                                                   "length size(%d) + value size(%d).\n Interrupting data parsing.",
                              *size,
                              fullObjSize,
                              tlvObjOut->tagSize,
@@ -257,6 +278,15 @@ static uint16_t __getTag(uint8_t *data)
 
 static uint16_t __getLengthFieldSize(uint8_t *data)
 {
+    /* 
+    *  Spec definition of the length field size:
+    *
+    *  When bit b8 of the most significant byte of the length field is set to 1, 
+    * the subsequent bits b7 to b1 of the most significant byte code the number of 
+    *  subsequent bytes in the length field. The subsequent bytes code an integer 
+    * representing the number of bytes in the value field. Two bytes are necessary 
+    * to express up to 255 bytes in the value field.
+    */
     if (*data & MULTPLES_BYTES_LENGTH_MASK)
     {
         return (*data & (~MULTPLES_BYTES_LENGTH_MASK)) + 1;
@@ -332,11 +362,13 @@ static uint16_t __addIndentation(char *str, uint16_t constructedLevels)
 /**
  * Skip garbage data (0x00 or OxFF) in begining of data.
  */
-static uint16_t __skipGarbageData(uint8_t *data, uint16_t size){
+static uint16_t __skipGarbageData(uint8_t *data, uint16_t size)
+{
     uint8_t *dataPtr = data;
-    uint16_t skippedBytes= 0;
+    uint16_t skippedBytes = 0;
 
-    while(size && (*dataPtr == 0 || *dataPtr == 0xFF)){
+    while (size && (*dataPtr == 0 || *dataPtr == 0xFF))
+    {
         ++dataPtr;
         ++skippedBytes;
         size--;

@@ -1,3 +1,10 @@
+/**
+ * @file
+ * @brief Main souce files containing examples using the BER TLV lib
+ * @author Pedro Eugênio Rocha Medeiros
+ * @date 14/10/2021
+ */
+
 #include <stdio.h>
 #include "ber_tlv.h"
 #include <stdlib.h>

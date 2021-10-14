@@ -1,3 +1,10 @@
+/**
+ * @file
+ * @brief Header file of BER-TLV parser lib
+ * @author Pedro Eugênio Rocha Medeiros
+ * @date 14/10/2021
+ */
+
 #ifndef __BER_TLV_H
 #define __BER_TLV_H
 
@@ -26,19 +33,19 @@ typedef struct
 
 /**
  * Prints raw data as BER TLV objects
- * @param data pointer to rawData.
- * @param dataDize Data size in bytes.
+ * @param data pointer to raw data.
+ * @param size Data size in bytes.
  * @param outputStr pointer to output string.
  * @return Total bytes writen.
  */
-uint16_t berTlv_printFromRawData(uint8_t *data, uint16_t dataSize, char *outputStr);
+uint16_t berTlv_printFromRawData(uint8_t *data, uint16_t size, char *outputStr);
 
 /**
  * @brief Parse an raw data array.
  * @warning: As garbage data is allowed before, between and after tlv objects, this function will 
  * skip garbage data and update size accordingly.
  * @param data Raw data pointer
- * @param size Pointer to the raw data size in bytes
+ * @param size Data size in bytes
  * @param tlvObjOut Pointer to tlv object that will be filled with parsed data.
  * @param isNotInConstructedObject  Infors if the current object is within a constructed object.
  * @return true if an error happened during the data parsing.
