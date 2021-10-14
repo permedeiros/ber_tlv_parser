@@ -3,17 +3,19 @@
 #include <stdlib.h>
 
 int main(void){
-    
+    char outputStr [4096];
 
-    printf("\nTest 1: One byte tag, one byte size, contructed object containing only primitive objects\n\n");
+    printf("\nTest 1: One byte tag, one byte size, constructed object containing only primitive objects\n\n");
 
     uint8_t tlvObject[] = {
-        0xE1, 0x0B, 0xC1, 0x03, 0x01, 0x02,
-        0x03, 0xC2, 0x00, 0xC3, 0x02, 0xAA,
-        0xBB
+        0xE1, 0x0B, 
+            0xC1, 0x03, 0x01, 0x02,0x03, 
+            0xC2, 0x00, 
+            0xC3, 0x02, 0xAA, 0xBB
     };
 
-    berTlv_printFromRawData(tlvObject, sizeof(tlvObject));
+    berTlv_printFromRawData(tlvObject, sizeof(tlvObject), outputStr);
+    printf("%s", outputStr); 
 
     printf("\nTest 2: Two primitive objects in sequence\n\n");
     uint8_t tlvObj2 [] = {
@@ -22,16 +24,18 @@ int main(void){
         0xD4, 0x41, 0x22, 0x01, 0x10, 0x03, 0x40, 0x00, 
         0x00, 0x48, 0x1F
     };
-    berTlv_printFromRawData(tlvObj2, sizeof(tlvObj2));
+    berTlv_printFromRawData(tlvObj2, sizeof(tlvObj2), outputStr);
+    printf("%s\n", outputStr); 
 
-    printf("\nTest 3: Two bytes tag, one byte length, primitive object\n\n");
+    printf("\nTest 3: Two bytes tag, one byte length, single primitive object\n\n");
     uint8_t tlvObj3 [] = {
         0x1F, 0x71, 0x05, 0x01, 0x02, 0x03, 0x04, 0x05
     };
 
-    berTlv_printFromRawData(tlvObj3, sizeof(tlvObj3));
+    berTlv_printFromRawData(tlvObj3, sizeof(tlvObj3), outputStr);
+    printf("%s\n", outputStr); 
 
-    printf("\nTest 4: Multi-level nesting of constructed data object\n\n");
+    printf("\nTest 4: Multi-level nesting of constructed data objects\n\n");
     uint8_t tlvObj4 [] = {
         0x7F, 0x71, 0x1C, 
             0x7F, 0x72, 0x15,
@@ -45,9 +49,10 @@ int main(void){
         0x82, 0x02, 0x33, 0x44
     };
 
-    berTlv_printFromRawData(tlvObj4, sizeof(tlvObj4));
+    berTlv_printFromRawData(tlvObj4, sizeof(tlvObj4), outputStr);
+    printf("%s\n", outputStr); 
 
-    printf("\nTest 5: Two bytes tag, three bytes length (256 bytes payload), primitive object\n\n");
+    printf("\nTest 5: Two bytes tag, three bytes length (256 bytes payload), single primitive object\n\n");
     uint8_t tlvObj5 [] = {
         0x1F, 0x71, 0x82, 0x01, 0x00,
         0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 
@@ -69,8 +74,8 @@ int main(void){
     };
 
 
-    berTlv_printFromRawData(tlvObj5, sizeof(tlvObj5));
-
+    berTlv_printFromRawData(tlvObj5, sizeof(tlvObj5), outputStr);
+    printf("%s\n", outputStr); 
     
     printf("\nTest 6: Assertion of invalid length\n\n");
     uint8_t tlvObj6 [] = {
@@ -78,8 +83,8 @@ int main(void){
         0x03, 0xC2, 0x00, 0xC3, 0x02, 0xAA,
         // mission one byte here
     };
-    berTlv_printFromRawData(tlvObj6, sizeof(tlvObj6));
-
+    berTlv_printFromRawData(tlvObj6, sizeof(tlvObj6), outputStr);
+    printf("%s\n", outputStr); 
 
     printf("\nTest 7: Garbage data (0x00 or 0xFF) before, between and after tlv objects \n\n");
     uint8_t tlvObj7 [] = {
@@ -90,7 +95,7 @@ int main(void){
         0xD4, 0x41, 0x22, 0x01, 0x10, 0x03, 0x40, 0x00, 0x00, 0x48, 0x1F,
         0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF // Garbage data
     };
-    berTlv_printFromRawData(tlvObj7, sizeof(tlvObj7));
-
+    berTlv_printFromRawData(tlvObj7, sizeof(tlvObj7), outputStr);
+    printf("%s\n", outputStr); 
     return 0;
 }

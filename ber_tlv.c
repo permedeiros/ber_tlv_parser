@@ -23,7 +23,7 @@ const uint8_t MIN_HEADER_SIZE = 2;
 
 //! Bit position of TLV object class in the Tag field
 const uint8_t TAG_CLASS_BIT_POS = 6;
-//! Bit mas to extract the object class
+//! Bit mask to extract the object class
 const uint8_t TAG_CLASS_MASK = 0xC0;
 
 //! Universal class
@@ -41,7 +41,7 @@ const char *BER_TLV_CLASSES[] = {"universal class",
                                  "context-specific class",
                                  "private class"};
 
-//! Maskt to extract the tag size from first byte of the tag value
+//! Bit mask to extract the tag size from first byte of tag value
 const uint8_t TWO_BYTES_TAG_MASK = 0x1F;
 
 //! Bit position of object type (primitive or constructed) in first byte of tag field
@@ -58,7 +58,7 @@ const char *BER_TLV_OBJECTS_TYPES[] = {"primitive",
 //! Bit mask used to know if the lenght field has multiple bytes.
 const uint8_t MULTPLES_BYTES_LENGTH_MASK = 0x80;
 
-//------------------------------------------------Static fuctions definitions----------------------------------------------------//
+//------------------------------------------------Static fuctions declaration----------------------------------------------------//
 static bool __isConstructed(TBerTlvObj *tlvObj);
 static uint32_t __getValueSize(uint8_t *data);
 static uint16_t __getLength(uint8_t *data);
@@ -69,19 +69,19 @@ static const char *__getObjTypeString(TBerTlvObj *tlvObj);
 static const char *__getClassString(TBerTlvObj *tlvObj);
 static uint8_t __getObjTypeIndex(uint8_t tagByte);
 static uint8_t __getClassIndex(uint8_t tagByte);
-static char *__addIndentation(char *str, uint16_t constructedLevels);
+static uint16_t __addIndentation(char *str, uint16_t constructedLevels);
 static uint16_t __skipGarbageData(uint8_t *data, uint16_t size);
 
 //-----------------------------------------------------------------------------------------------------------------------------//
 //-------------------------------------------------------Public functions------------------------------------------------------//
 
-void berTlv_printFromRawData(uint8_t *rawData, uint16_t size)
+uint16_t berTlv_printFromRawData(uint8_t *data, uint16_t dataSize, char *outputStr)
 {
     TBerTlvObj tlvObj;
-    char outputStr[4096];
     char *strP = outputStr;
-    uint8_t *data = rawData;
-    uint16_t remaningSize = size;
+    uint8_t *dataPtr = data;
+    uint16_t remaningSize = dataSize;
+    uint16_t bytesWriten = 0;
 
     uint16_t constructedSizeStack[5] = {0};
     uint8_t constructedLevels = 0;
@@ -90,17 +90,18 @@ void berTlv_printFromRawData(uint8_t *rawData, uint16_t size)
 
     while (remaningSize)
     {
-        bool err = berTlv_parseRawData(data, &remaningSize, &tlvObj, isNotInConstructedObject);
-        if (err) return;
+        bool err = berTlv_parseRawData(dataPtr, &remaningSize, &tlvObj, isNotInConstructedObject);
+        if (err) return bytesWriten;
         if(remaningSize == 0) break;
-        strP = __addIndentation(strP, constructedLevels);
+        char *startPos = strP;
+        strP += __addIndentation(strP, constructedLevels);
         strP += sprintf(strP, "TAG - 0x%02X (%s, %s)\n",
                         tlvObj.tag,
                         __getClassString(&tlvObj),
                         __getObjTypeString(&tlvObj));
-        strP = __addIndentation(strP, constructedLevels);
+        strP += __addIndentation(strP, constructedLevels);
         strP += sprintf(strP, "LEN - %d bytes\n", tlvObj.lengthValue);
-        data = tlvObj.value;
+        dataPtr = tlvObj.value;
         uint16_t headerSize = (tlvObj.tagSize + tlvObj.lengthSize);
         if (__isConstructed(&tlvObj))
         {
@@ -124,11 +125,11 @@ void berTlv_printFromRawData(uint8_t *rawData, uint16_t size)
             remaningSize -= fullObjSize;
             if (tlvObj.valueSize)
             {
-                strP = __addIndentation(strP, constructedLevels);
+                strP += __addIndentation(strP, constructedLevels);
                 strP += sprintf(strP, "VAL - ");
                 for (int i = 0; i < tlvObj.valueSize; ++i)
                 {
-                    strP += sprintf(strP, "0x%02X ", *data++);
+                    strP += sprintf(strP, "0x%02X ", *dataPtr++);
                 }
                 strP += sprintf(strP, "\n");
             }
@@ -147,9 +148,10 @@ void berTlv_printFromRawData(uint8_t *rawData, uint16_t size)
                 isNotInConstructedObject = true;
             }
         }
+        bytesWriten += (strP - startPos);
     }
 
-    printf("%s\n", outputStr);
+    return bytesWriten;
 }
 
 bool berTlv_parseRawData(uint8_t *data, uint16_t *size, TBerTlvObj *tlvObjOut, bool isNotInConstructedObject)
@@ -191,7 +193,7 @@ bool berTlv_parseRawData(uint8_t *data, uint16_t *size, TBerTlvObj *tlvObjOut, b
     uint8_t fullObjSize = tlvObjOut->tagSize + tlvObjOut->lengthSize + tlvObjOut->valueSize;
     error = *size < fullObjSize;
     BER_TLV_ASSERT_NON_FATAL(*size >= fullObjSize, "Invalid size (%d). It should be at least %d bytes -> tag size(%d) +"
-                                                  "length size(%d) + value size(%x).\n Interrupting data parsing.",
+                                                  "length size(%d) + value size(%d).\n Interrupting data parsing.",
                              *size,
                              fullObjSize,
                              tlvObjOut->tagSize,
@@ -310,18 +312,26 @@ static bool __isConstructed(TBerTlvObj *tlvObj)
     return ((*tagPtr & TAG_OBJ_TYPE_MASk) >> TAG_OBJ_TYPE_BIT_POS) == 1;
 }
 
-static char *__addIndentation(char *str, uint16_t constructedLevels)
+/**
+ * @brief Add a 2 space indentation into str for each level
+ * @param str string pointer
+ * @param constructedLevels Level of nested constructed objects.
+ * @return Amount of black space written
+ */
+static uint16_t __addIndentation(char *str, uint16_t constructedLevels)
 {
     uint8_t spaceCount = constructedLevels * 2;
+    uint8_t writeCount = spaceCount;
     while (spaceCount--)
     {
         *str++ = ' ';
     }
-    *str = 0;
-    return str;
+    return writeCount;
 }
 
-
+/**
+ * Skip garbage data (0x00 or OxFF) in begining of data.
+ */
 static uint16_t __skipGarbageData(uint8_t *data, uint16_t size){
     uint8_t *dataPtr = data;
     uint16_t skippedBytes= 0;

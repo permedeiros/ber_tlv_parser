@@ -25,9 +25,13 @@ typedef struct
 
 
 /**
- * @brief Prints raw data as BER TLV objects
+ * Prints raw data as BER TLV objects
+ * @param data pointer to rawData.
+ * @param dataDize Data size in bytes.
+ * @param outputStr pointer to output string.
+ * @return Total bytes writen.
  */
-void berTlv_printFromRawData(uint8_t *data, uint16_t size);
+uint16_t berTlv_printFromRawData(uint8_t *data, uint16_t dataSize, char *outputStr);
 
 /**
  * @brief Parse an raw data array.
